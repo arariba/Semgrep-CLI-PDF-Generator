@@ -1,5 +1,4 @@
 # Semgrep-CLI-PDF-Generator
-Automatically generate a pdf report from Semgrep CLI in Python.
 
 This script have been tested on Ubuntu. Theoretically it should be able to run on Windows nad Mac as it just a python script.
 
