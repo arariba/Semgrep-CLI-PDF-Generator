@@ -1,8 +1,8 @@
 # Semgrep-CLI-PDF-Generator
 
-This script have been tested on Ubuntu. Theoretically it should be able to run on Windows and Mac as it just a python script.
+This script has been tested on Ubuntu. Theoretically, it should be able to run on Windows and Mac as it is just a Python script.
 
-First and foremost it is recommended to run it in a python virtual environment
+First and foremost it is recommended to run it in a Python virtual environment
 ```
 python -m venv venv
 souce venv/bin/active
@@ -10,7 +10,7 @@ souce venv/bin/active
 
 ## Requirements
 
-This code depend on semgrep cli, you can install semgrep cli following the step in the websites
+This code depends on Semgrep CLI, you can install Semgrep CLI following the steps in the websites
 ```
 https://semgrep.dev/docs/getting-started/quickstart
 ```
