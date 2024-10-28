@@ -10,7 +10,7 @@ souce venv/bin/active
 
 ## Requirements
 
-This code depends on Semgrep CLI, you can install Semgrep CLI following the steps in the websites
+This code depends on Semgrep CLI, you can install Semgrep CLI by following the steps on the websites
 ```
 https://semgrep.dev/docs/getting-started/quickstart
 ```
