@@ -23,5 +23,5 @@ pip install -r requirement.txt
 ## Usage
 The script will need the path and output filename 
 ```
-python generate.py [PATH] [OUTPUT_NAME]
+python generate.py [PATH/TO/CODE] [OUTPUT_NAME]
 ```
