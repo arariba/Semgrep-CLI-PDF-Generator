@@ -12,6 +12,12 @@ class Findings:
         self.code = code
 
 class PDF(FPDF):
+    def __init__(self):
+        super().__init__()
+        # Set proper page margins
+        self.set_margins(20, 20, 20)  # Left, Top, Right margins
+        self.set_auto_page_break(auto=True, margin=25)  # Bottom margin
+    
     def header(self):
         self.set_font('Arial','BI' , size=8)
         # Title
@@ -64,7 +70,7 @@ class PDF(FPDF):
         # Get current Y position and page height
         current_y = self.get_y()
         page_height = self.h
-        margin = 15  # Bottom margin
+        margin = 25  # Bottom margin - increased for better spacing
         
         # Check if adding the required height would exceed the page
         if current_y + required_height > page_height - margin:
@@ -74,6 +80,18 @@ class PDF(FPDF):
     # Check if there's enough space for a section header
     def check_header_space(self, header_height=15):
         return self.check_page_break(header_height)
+
+    # Ensure proper table positioning within margins
+    def ensure_table_position(self):
+        # Reset to proper left margin for tables
+        self.set_x(20)
+        # Ensure we have enough space from top
+        if self.get_y() < 40:  # Account for header
+            self.set_y(40)
+
+    # Get available width for content (respecting margins)
+    def get_available_width(self):
+        return self.w - 40  # Page width minus left and right margins
 
     # Old code, to write the findings directly not in a table format
     # def write_findings(self, findings,type):
@@ -104,22 +122,36 @@ class PDF(FPDF):
         
         # Calculate the actual height needed for the data text
         line_height = 10
-        data_height = self.calculate_text_height(display_data, 160, line_height)
+        available_width = self.get_available_width()
+        data_width = available_width - int(available_width * 0.2)  # Calculate data width
+        data_height = self.calculate_text_height(display_data, data_width, line_height)
         
         # Check if we need a page break to keep the table row together
         if self.check_page_break(data_height):
             self.add_page()
+        
+        # Ensure we're within page margins
+        current_x = self.get_x()
+        if current_x < 20:  # Left margin
+            self.set_x(20)
+        elif current_x > self.w - 200:  # Right margin (table width is 200)
+            self.set_x(20)  # Reset to left margin
+        
+        # Calculate column widths based on available space
+        available_width = self.get_available_width()
+        label_width = int(available_width * 0.2)  # 20% for label
+        data_width = available_width - label_width  # Remaining for data
         
         # Store current x position
         x_pos = self.get_x()
         y_pos = self.get_y()
         
         # First column (label) - use same height as data column
-        self.cell(40, data_height, text, 1)
+        self.cell(label_width, data_height, text, 1)
         
         # Second column (data) - use multi_cell for automatic text wrapping
-        self.set_xy(x_pos + 40, y_pos)
-        self.multi_cell(160, line_height, display_data, 1, fill=True)
+        self.set_xy(x_pos + label_width, y_pos)
+        self.multi_cell(data_width, line_height, display_data, 1, fill=True)
         
         # Move to next line - the multi_cell already handles positioning
         # No need for additional ln() as multi_cell moves to the next row
@@ -129,18 +161,24 @@ class PDF(FPDF):
         col_width = 50
         if findings:
             for i, finding in enumerate(findings):
+                # Ensure proper table positioning
+                self.ensure_table_position()
+                
                 # Calculate total height needed for this finding
                 total_height = 0
-                total_height += self.calculate_text_height(str(finding.category), 160, 10)
-                total_height += self.calculate_text_height(str(finding.description), 160, 10)
+                available_width = self.get_available_width()
+                data_width = available_width - int(available_width * 0.2)
+                total_height += self.calculate_text_height(str(finding.category), data_width, 10)
+                total_height += self.calculate_text_height(str(finding.description), data_width, 10)
                 total_height += 10  # Severity level row (fixed height)
-                total_height += self.calculate_text_height(str(finding.reference), 160, 10)
-                total_height += self.calculate_text_height(str(finding.code), 160, 10)
+                total_height += self.calculate_text_height(str(finding.reference), data_width, 10)
+                total_height += self.calculate_text_height(str(finding.code), data_width, 10)
                 total_height += 15  # Add spacing between rows
                 
                 # Check if we need a page break to keep the entire finding together
                 if self.check_page_break(total_height):
                     self.add_page()
+                    self.ensure_table_position()  # Reset position on new page
                 
                 self.create_table("Category",self.clean_text(str(finding.category)))
                 self.create_table("Description",self.clean_text(str(finding.description)))
@@ -263,12 +301,11 @@ def store_finding(category_deciders, descriptions, references, codes):
 # Write to PDF
 def generate_pdf_report(high, medium, low, filename):
     pdf = PDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
     #Add title
     pdf.set_font("Arial", style="B", size=18)
-    pdf.multi_cell(200, 10, txt="Semgrep Report")
+    pdf.multi_cell(pdf.get_available_width(), 10, txt="Semgrep Report")
     pdf.ln(5)
 
     # Add summary section
@@ -276,9 +313,9 @@ def generate_pdf_report(high, medium, low, filename):
     if pdf.check_header_space(20):  # Summary needs more space
         pdf.add_page()
     pdf.set_font("Arial", style="B", size=12)
-    pdf.multi_cell(200, 10, txt="Scan Summary")
+    pdf.multi_cell(pdf.get_available_width(), 10, txt="Scan Summary")
     pdf.set_font("Arial", size=10)
-    pdf.multi_cell(200, 10, findings[0])
+    pdf.multi_cell(pdf.get_available_width(), 10, findings[0])
     pdf.ln(5)
 
     # High severity findings
@@ -287,7 +324,7 @@ def generate_pdf_report(high, medium, low, filename):
         if pdf.check_header_space():
             pdf.add_page()
         pdf.set_font("Arial", style="B", size=12)
-        pdf.multi_cell(200, 10, txt="High Severity Findings")
+        pdf.multi_cell(pdf.get_available_width(), 10, txt="High Severity Findings")
         pdf.set_font("Arial", size=10)
         pdf.write_to_table(high,"High")
         pdf.ln(3)
@@ -298,7 +335,7 @@ def generate_pdf_report(high, medium, low, filename):
         if pdf.check_header_space():
             pdf.add_page()
         pdf.set_font("Arial", style="B", size=12)
-        pdf.multi_cell(200, 10, txt="Medium Severity Findings")
+        pdf.multi_cell(pdf.get_available_width(), 10, txt="Medium Severity Findings")
         pdf.set_font("Arial", size=10)
         pdf.write_to_table(medium,"Medium")
         pdf.ln(3)
@@ -309,7 +346,7 @@ def generate_pdf_report(high, medium, low, filename):
         if pdf.check_header_space():
             pdf.add_page()
         pdf.set_font("Arial", style="B", size=12)
-        pdf.multi_cell(200, 10, txt="Low Severity Findings")
+        pdf.multi_cell(pdf.get_available_width(), 10, txt="Low Severity Findings")
         pdf.set_font("Arial", size=10)
         pdf.write_to_table(low,"Low")
 
