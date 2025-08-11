@@ -44,7 +44,7 @@ class PDF(FPDF):
         return text[:max_length-3] + "..."
 
     # Handle long text by truncating based on available height
-    def truncate_text_by_height(self, text, max_width, max_height, line_height=10):
+    def truncate_text_by_height(self, text, max_width, max_height, line_height=6):  # Changed default from 10 to 6
         # Calculate how many lines we can fit
         max_lines = int(max_height / line_height)
         chars_per_line = int(max_width / 2.5)
@@ -120,7 +120,7 @@ class PDF(FPDF):
             return '\n'.join(truncated_lines)
 
     # Create a smart summary for extremely long descriptions
-    def create_smart_summary(self, text, max_lines=8, chars_per_line=60):
+    def create_smart_summary(self, text, max_lines=12, chars_per_line=60):  # Increased max_lines from 8 to 12
         """Create a smart summary for very long descriptions"""
         if len(text) <= chars_per_line * 2:
             return text  # Short enough, return as is
@@ -154,7 +154,7 @@ class PDF(FPDF):
         return summary
 
     # Calculate the height needed for text in a given width
-    def calculate_text_height(self, text, width, line_height=10):
+    def calculate_text_height(self, text, width, line_height=6):  # Changed default from 10 to 6
         # Calculate how many lines the text will actually take with word wrapping
         chars_per_line = int(width / 2.5)
         
@@ -242,7 +242,7 @@ class PDF(FPDF):
         self.cell(width, height, '', border, ln=0, fill=fill)
         
         # Calculate line height to fit text within the exact height
-        line_height = 10
+        line_height = 6  # Reduced line height for tighter spacing
         max_lines = int(height / line_height)
         
         # Use multi_cell but limit to the exact height
@@ -294,7 +294,7 @@ class PDF(FPDF):
                 display_data = display_data[:200] + "..." if len(display_data) > 200 else display_data
         
         # Calculate the actual height needed for the data text
-        line_height = 10
+        line_height = 6  # Reduced from 10 to 6 for tighter line spacing
         available_width = self.get_available_width()
         data_width = available_width - int(available_width * 0.2)  # Calculate data width
         data_height = self.calculate_text_height(display_data, data_width, line_height)
@@ -345,11 +345,11 @@ class PDF(FPDF):
                 total_height = 0
                 available_width = self.get_available_width()
                 data_width = available_width - int(available_width * 0.2)
-                total_height += self.calculate_text_height(str(finding.category), data_width, 10)
-                total_height += self.calculate_text_height(str(finding.description), data_width, 10)
-                total_height += 10  # Severity level row (fixed height)
-                total_height += self.calculate_text_height(str(finding.reference), data_width, 10)
-                total_height += self.calculate_text_height(str(finding.code), data_width, 10)
+                total_height += self.calculate_text_height(str(finding.category), data_width, 6)
+                total_height += self.calculate_text_height(str(finding.description), data_width, 6)
+                total_height += 6  # Severity level row (reduced height)
+                total_height += self.calculate_text_height(str(finding.reference), data_width, 6)
+                total_height += self.calculate_text_height(str(finding.code), data_width, 6)
                 total_height += 15  # Add spacing between rows
                 
                 # Check if we need a page break to keep the entire finding together
