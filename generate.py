@@ -53,67 +53,136 @@ class PDF(FPDF):
         if len(text) <= chars_per_line:
             return text
         
-        # Split text into lines and limit to max_lines
-        lines = text.split('\n')
-        truncated_lines = []
-        total_chars = 0
+        # Split text into words and build lines intelligently
+        words = text.split()
+        lines = []
+        current_line = ""
         
-        for line in lines:
-            if len(truncated_lines) >= max_lines:
-                break
-                
-            if len(line) <= chars_per_line:
-                truncated_lines.append(line)
-                total_chars += len(line)
+        for word in words:
+            # Check if adding this word would exceed the line width
+            test_line = current_line + " " + word if current_line else word
+            
+            if len(test_line) <= chars_per_line:
+                # Word fits on current line
+                current_line = test_line
             else:
-                # Split long line into multiple lines
-                remaining_lines = max_lines - len(truncated_lines)
-                if remaining_lines <= 0:
+                # Word doesn't fit, start new line
+                if current_line:
+                    lines.append(current_line)
+                    current_line = word
+                else:
+                    # Single word is too long, split it intelligently
+                    if len(word) > chars_per_line:
+                        # Try to break at hyphens or underscores first
+                        if '-' in word:
+                            parts = word.split('-')
+                            for i, part in enumerate(parts):
+                                if i > 0:
+                                    part = '-' + part
+                                if len(part) <= chars_per_line:
+                                    lines.append(part)
+                                else:
+                                    # Break long part into chunks
+                                    for j in range(0, len(part), chars_per_line):
+                                        chunk = part[j:j + chars_per_line]
+                                        lines.append(chunk)
+                        elif '_' in word:
+                            parts = word.split('_')
+                            for i, part in enumerate(parts):
+                                if i > 0:
+                                    part = '_' + part
+                                if len(part) <= chars_per_line:
+                                    lines.append(part)
+                                else:
+                                    # Break long part into chunks
+                                    for j in range(0, len(part), chars_per_line):
+                                        chunk = part[j:j + chars_per_line]
+                                        lines.append(chunk)
+                        else:
+                            # Break long word into chunks
+                            for i in range(0, len(word), chars_per_line):
+                                chunk = word[i:i + chars_per_line]
+                                lines.append(chunk)
+                    else:
+                        lines.append(word)
+                    current_line = ""
+        
+        # Add the last line if there's content
+        if current_line:
+            lines.append(current_line)
+        
+        # Limit to max_lines and join
+        if len(lines) <= max_lines:
+            return '\n'.join(lines)
+        else:
+            # If we have more lines than can fit, truncate at word boundaries
+            truncated_lines = lines[:max_lines]
+            return '\n'.join(truncated_lines)
+
+    # Create a smart summary for extremely long descriptions
+    def create_smart_summary(self, text, max_lines=8, chars_per_line=60):
+        """Create a smart summary for very long descriptions"""
+        if len(text) <= chars_per_line * 2:
+            return text  # Short enough, return as is
+        
+        # Split into sentences for better summary
+        sentences = text.split('. ')
+        if len(sentences) <= 2:
+            # If only 1-2 sentences, just truncate at word boundary
+            words = text.split()
+            summary = ""
+            for word in words:
+                if len(summary + " " + word) <= chars_per_line * max_lines:
+                    summary += " " + word if summary else word
+                else:
                     break
-                    
-                # Calculate how many lines this long line needs
-                needed_lines = max(1, (len(line) // chars_per_line) + 1)
-                lines_to_add = min(needed_lines, remaining_lines)
-                
-                for i in range(lines_to_add):
-                    start = i * chars_per_line
-                    end = start + chars_per_line
-                    if start < len(line):
-                        truncated_lines.append(line[start:end])
-                        total_chars += len(line[start:end])
+            return summary + "..." if len(summary) < len(text) else summary
         
-        # Join lines and truncate if still too long
-        result = '\n'.join(truncated_lines)
+        # Take first few sentences that fit within the limit
+        summary = ""
+        for sentence in sentences:
+            if len(summary + sentence + ". ") <= chars_per_line * max_lines:
+                summary += sentence + ". " if summary else sentence + ". "
+            else:
+                break
         
-        # Truncate if the result is still too long for the width
-        if len(result) > chars_per_line * max_lines:
-            result = result[:chars_per_line * max_lines - 3] + "..."
+        # Clean up and add ellipsis if truncated
+        summary = summary.strip()
+        if len(summary) < len(text):
+            summary += " [Full description available in scan output]"
         
-        return result
+        return summary
 
     # Calculate the height needed for text in a given width
     def calculate_text_height(self, text, width, line_height=10):
-        # More accurate calculation of lines needed
-        # Arial 10pt font: approximately 2.5 units per character
+        # Calculate how many lines the text will actually take with word wrapping
         chars_per_line = int(width / 2.5)
         
         if len(text) <= chars_per_line:
             return line_height
         
-        # Count actual line breaks in text
-        lines = text.split('\n')
-        total_lines = 0
+        # Split text into words and calculate actual lines needed
+        words = text.split()
+        lines = 1  # Start with 1 line
+        current_line_length = 0
         
-        for line in lines:
-            if len(line) <= chars_per_line:
-                total_lines += 1
+        for word in words:
+            # Add space if not first word
+            word_with_space = " " + word if current_line_length > 0 else word
+            
+            if current_line_length + len(word_with_space) <= chars_per_line:
+                # Word fits on current line
+                current_line_length += len(word_with_space)
             else:
-                # Calculate how many lines this long line needs
-                total_lines += max(1, (len(line) // chars_per_line) + 1)
+                # Word doesn't fit, start new line
+                lines += 1
+                current_line_length = len(word)
         
-        # Ensure minimum height and add small buffer for consistency
-        calculated_height = total_lines * line_height
-        return max(calculated_height, line_height)
+        # Calculate total height needed
+        total_height = lines * line_height
+        
+        # Ensure minimum height
+        return max(total_height, line_height)
 
     # Check if there's enough space on the current page for a table row
     def check_page_break(self, required_height):
@@ -207,8 +276,22 @@ class PDF(FPDF):
             elif data == "Low":
                 self.set_fill_color(204, 255, 204)
         
-        # Truncate very long text to prevent layout issues
-        display_data = self.truncate_text(str(data))
+        # Use full text instead of aggressive truncation
+        display_data = str(data)
+        
+        # For descriptions, check if they're extremely long and create smart summaries
+        if text == "Description" and len(display_data) > 500:  # Very long descriptions
+            display_data = self.create_smart_summary(display_data)
+        elif text == "Reference" and len(display_data) > 300:  # Long references
+            display_data = self.create_smart_summary(display_data, max_lines=4, chars_per_line=60)
+        elif text == "Affected Lines" and len(display_data) > 200:  # Long code snippets
+            # For code, try to show the most relevant part
+            if '\n' in display_data:
+                lines = display_data.split('\n')
+                if len(lines) > 3:
+                    display_data = '\n'.join(lines[:3]) + "\n[Additional lines available in scan output]"
+            else:
+                display_data = display_data[:200] + "..." if len(display_data) > 200 else display_data
         
         # Calculate the actual height needed for the data text
         line_height = 10
@@ -216,8 +299,8 @@ class PDF(FPDF):
         data_width = available_width - int(available_width * 0.2)  # Calculate data width
         data_height = self.calculate_text_height(display_data, data_width, line_height)
         
-        # Further truncate text to fit within the calculated height
-        display_data = self.truncate_text_by_height(str(data), data_width, data_height, line_height)
+        # Apply intelligent text wrapping that respects word boundaries
+        display_data = self.truncate_text_by_height(str(display_data), data_width, data_height, line_height)
         
         # Check if we need a page break to keep the table row together
         if self.check_page_break(data_height):
@@ -414,7 +497,12 @@ def generate_pdf_report(high, medium, low, filename):
     pdf.multi_cell(pdf.get_available_width(), 10, txt="Scan Summary")
     pdf.set_font("Arial", size=10)
     pdf.multi_cell(pdf.get_available_width(), 10, findings[0])
-    pdf.ln(5)
+    pdf.ln(3)
+    
+    # Add note about smart summaries
+    pdf.set_font("Arial", style="I", size=9)
+    pdf.multi_cell(pdf.get_available_width(), 8, txt="Note: Very long descriptions are automatically summarized for better readability. Full details are available in the original scan output.")
+    pdf.ln(3)
 
     # High severity findings
     if high:
