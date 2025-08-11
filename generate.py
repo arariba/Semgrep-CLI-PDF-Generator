@@ -43,6 +43,54 @@ class PDF(FPDF):
             return text
         return text[:max_length-3] + "..."
 
+    # Handle long text by truncating based on available height
+    def truncate_text_by_height(self, text, max_width, max_height, line_height=10):
+        # Calculate how many lines we can fit
+        max_lines = int(max_height / line_height)
+        chars_per_line = int(max_width / 2.5)
+        
+        # If text fits in one line, return as is
+        if len(text) <= chars_per_line:
+            return text
+        
+        # Split text into lines and limit to max_lines
+        lines = text.split('\n')
+        truncated_lines = []
+        total_chars = 0
+        
+        for line in lines:
+            if len(truncated_lines) >= max_lines:
+                break
+                
+            if len(line) <= chars_per_line:
+                truncated_lines.append(line)
+                total_chars += len(line)
+            else:
+                # Split long line into multiple lines
+                remaining_lines = max_lines - len(truncated_lines)
+                if remaining_lines <= 0:
+                    break
+                    
+                # Calculate how many lines this long line needs
+                needed_lines = max(1, (len(line) // chars_per_line) + 1)
+                lines_to_add = min(needed_lines, remaining_lines)
+                
+                for i in range(lines_to_add):
+                    start = i * chars_per_line
+                    end = start + chars_per_line
+                    if start < len(line):
+                        truncated_lines.append(line[start:end])
+                        total_chars += len(line[start:end])
+        
+        # Join lines and truncate if still too long
+        result = '\n'.join(truncated_lines)
+        
+        # Truncate if the result is still too long for the width
+        if len(result) > chars_per_line * max_lines:
+            result = result[:chars_per_line * max_lines - 3] + "..."
+        
+        return result
+
     # Calculate the height needed for text in a given width
     def calculate_text_height(self, text, width, line_height=10):
         # More accurate calculation of lines needed
@@ -63,7 +111,9 @@ class PDF(FPDF):
                 # Calculate how many lines this long line needs
                 total_lines += max(1, (len(line) // chars_per_line) + 1)
         
-        return total_lines * line_height
+        # Ensure minimum height and add small buffer for consistency
+        calculated_height = total_lines * line_height
+        return max(calculated_height, line_height)
 
     # Check if there's enough space on the current page for a table row
     def check_page_break(self, required_height):
@@ -92,6 +142,46 @@ class PDF(FPDF):
     # Get available width for content (respecting margins)
     def get_available_width(self):
         return self.w - 40  # Page width minus left and right margins
+
+    # Create a table cell with proper vertical alignment
+    def create_aligned_cell(self, width, height, text, border=1, align='C', fill=False):
+        # Calculate vertical center position for the text
+        text_height = 10  # Height of single line text
+        y_offset = (height - text_height) / 2
+        
+        # Store current position
+        current_x = self.get_x()
+        current_y = self.get_y()
+        
+        # Draw the cell border
+        self.cell(width, height, '', border, ln=0, fill=fill)
+        
+        # Position text in the center of the cell
+        self.set_xy(current_x, current_y + y_offset)
+        self.cell(width, text_height, text, 0, align=align, ln=0)
+        
+        # Don't change position - let the calling method control it
+        # This ensures table continuity
+
+    # Create a multi_cell with exact height control
+    def create_exact_height_cell(self, width, height, text, border=1, fill=False):
+        # Store current position
+        current_x = self.get_x()
+        current_y = self.get_y()
+        
+        # Draw the cell border with exact height
+        self.cell(width, height, '', border, ln=0, fill=fill)
+        
+        # Calculate line height to fit text within the exact height
+        line_height = 10
+        max_lines = int(height / line_height)
+        
+        # Use multi_cell but limit to the exact height
+        self.set_xy(current_x, current_y)
+        self.multi_cell(width, line_height, text, 0, fill=fill)
+        
+        # Don't change position - let the calling method control it
+        # This ensures table continuity
 
     # Old code, to write the findings directly not in a table format
     # def write_findings(self, findings,type):
@@ -126,6 +216,9 @@ class PDF(FPDF):
         data_width = available_width - int(available_width * 0.2)  # Calculate data width
         data_height = self.calculate_text_height(display_data, data_width, line_height)
         
+        # Further truncate text to fit within the calculated height
+        display_data = self.truncate_text_by_height(str(data), data_width, data_height, line_height)
+        
         # Check if we need a page break to keep the table row together
         if self.check_page_break(data_height):
             self.add_page()
@@ -146,15 +239,16 @@ class PDF(FPDF):
         x_pos = self.get_x()
         y_pos = self.get_y()
         
-        # First column (label) - use same height as data column
-        self.cell(label_width, data_height, text, 1)
+        # First column (label) - use same height as data column and center text vertically
+        self.create_aligned_cell(label_width, data_height, text, border=1, align='C', fill=False)
         
-        # Second column (data) - use multi_cell for automatic text wrapping
+        # Second column (data) - use exact height control to match first column
         self.set_xy(x_pos + label_width, y_pos)
-        self.multi_cell(data_width, line_height, display_data, 1, fill=True)
+        self.create_exact_height_cell(data_width, data_height, display_data, border=1, fill=True)
         
-        # Move to next line - the multi_cell already handles positioning
-        # No need for additional ln() as multi_cell moves to the next row
+        # Position for next row - both cells now have exactly the same height
+        # Don't use ln() as it breaks table continuity
+        self.set_xy(20, y_pos + data_height)  # Reset to left margin, move down by cell height
 
     # The function to iterate through the available findings and write to data
     def write_to_table(self, findings, type):
@@ -186,11 +280,15 @@ class PDF(FPDF):
                 self.create_table("Reference",self.clean_text(str(finding.reference)))
                 self.create_table("Affected Lines",self.clean_text(str(finding.code)))
                 
-                # Add consistent spacing between findings
+                # Add spacing between findings while maintaining table structure
                 if i < len(findings) - 1:
-                    self.ln(3)
+                    # Add space between findings but keep table structure
+                    current_y = self.get_y()
+                    self.set_xy(20, current_y + 5)  # Small gap between findings
                 else:
-                    self.ln(2)
+                    # Last finding - add final spacing
+                    current_y = self.get_y()
+                    self.set_xy(20, current_y + 3)
 
 
 # Scan the code for vulnerability using semgrep cli
