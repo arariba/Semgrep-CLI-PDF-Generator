@@ -714,13 +714,27 @@ def scan(path):
 
 # Check for system arguments and extract the path
 def check_sysarg():
-    if len(sys.argv) != 3:
+    if len(sys.argv) < 2:
         print("Usage: python generate.py [PATH] [OUTPUT_NAME]")
-        print("Example: python generate.py /path/to/project/ report.pdf")
+        print("Example: python generate.py /path/to/project/")
+        print("Example: python generate.py /path/to/project/ custom-name.pdf")
+        print("Note: If no output name is provided, will use: reports/<project-name>/<project-name>-yyyymmddhhmm.pdf")
+        exit()
+    
+    if len(sys.argv) > 3:
+        print("Usage: python generate.py [PATH] [OUTPUT_NAME]")
+        print("Too many arguments provided.")
         exit()
 
     path = sys.argv[1]
-    filename = sys.argv[2]
+    
+    # Check if output filename was provided
+    if len(sys.argv) == 3:
+        filename = sys.argv[2]
+    else:
+        # Generate default filename
+        filename = None
+    
     return path, filename
 
 def extract_project_name(path):
@@ -735,6 +749,28 @@ def extract_project_name(path):
     project_name = path_parts[-1] if path_parts else "Unknown Project"
     
     return project_name
+
+def generate_default_output_path(project_name):
+    """Generate default output path: reports/<project-name>/<project-name>-yyyymmddhhmm.pdf"""
+    import os
+    from datetime import datetime
+    
+    # Create timestamp in yyyymmddhhmm format
+    timestamp = datetime.now().strftime("%Y%m%d%H%M")
+    
+    # Create directory path
+    reports_dir = f"reports/{project_name}"
+    
+    # Create directory if it doesn't exist
+    os.makedirs(reports_dir, exist_ok=True)
+    
+    # Generate filename
+    filename = f"{project_name}-{timestamp}.pdf"
+    
+    # Full path
+    full_path = os.path.join(reports_dir, filename)
+    
+    return full_path
 
 # Combine the description
 def clean_description(messages):
@@ -988,6 +1024,11 @@ if __name__ == "__main__":
     # Extract project name from path
     project_name = extract_project_name(path)
     print(f"Scanning project: {project_name}")
+    
+    # Generate default output path if none provided
+    if filename is None:
+        filename = generate_default_output_path(project_name)
+        print(f"Output will be saved to: {filename}")
     
     findings = scan(path)
     category, description, reference, code = categorize_finding(findings)

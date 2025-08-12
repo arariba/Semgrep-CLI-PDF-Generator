@@ -1,2 +1,5 @@
 *.pdf
 semgrep.json
+
+reports/*
+!reports/.gitkeep
