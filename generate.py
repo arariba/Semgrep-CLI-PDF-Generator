@@ -716,11 +716,25 @@ def scan(path):
 def check_sysarg():
     if len(sys.argv) != 3:
         print("Usage: python generate.py [PATH] [OUTPUT_NAME]")
+        print("Example: python generate.py /path/to/project/ report.pdf")
         exit()
 
     path = sys.argv[1]
     filename = sys.argv[2]
     return path, filename
+
+def extract_project_name(path):
+    """Extract project name from directory path"""
+    # Remove trailing slash if present
+    clean_path = path.rstrip('/')
+    
+    # Split by path separator and get the last part
+    path_parts = clean_path.split('/')
+    
+    # Get the project name (last directory in path)
+    project_name = path_parts[-1] if path_parts else "Unknown Project"
+    
+    return project_name
 
 # Combine the description
 def clean_description(messages):
@@ -802,7 +816,7 @@ def store_finding(category_deciders, descriptions, references, codes):
     return high_findings, medium_findings, low_findings
 
 # Write to PDF
-def generate_pdf_report(high, medium, low, filename):
+def generate_pdf_report(high, medium, low, filename, project_name):
     pdf = PDF()
     pdf.add_page()
 
@@ -810,7 +824,7 @@ def generate_pdf_report(high, medium, low, filename):
     pdf.set_font("Arial", style="B", size=20)
     pdf.set_text_color(30, 30, 30)
     pdf.cell(0, 15, txt="", ln=1)  # Spacing
-    pdf.multi_cell(pdf.get_available_width(), 12, txt="Semgrep Security Analysis Report", align='C')
+    pdf.multi_cell(pdf.get_available_width(), 12, txt=f"Semgrep Security Analysis Report - {project_name}", align='C')
     pdf.ln(5)
 
     # Add executive summary section
@@ -827,8 +841,9 @@ def generate_pdf_report(high, medium, low, filename):
     pdf.set_font("Arial", size=10)
     pdf.set_text_color(80, 80, 80)
     
-    # Create summary table
+    # Create summary table with project info
     summary_data = [
+        ("Project Name", project_name),
         ("Total Findings", str(total_findings)),
         ("High Severity", str(len(high))),
         ("Medium Severity", str(len(medium))),
@@ -848,7 +863,7 @@ def generate_pdf_report(high, medium, low, filename):
         pdf.add_page()
     pdf.set_font("Arial", style="B", size=12)
     pdf.set_text_color(60, 60, 60)
-    pdf.multi_cell(pdf.get_available_width(), 10, txt="Scan Summary")
+    pdf.multi_cell(pdf.get_available_width(), 10, txt=f"Scan Summary - {project_name}")
     pdf.set_font("Arial", size=10)
     pdf.set_text_color(80, 80, 80)
     pdf.multi_cell(pdf.get_available_width(), 10, findings[0])
@@ -926,7 +941,7 @@ def generate_pdf_report(high, medium, low, filename):
     pdf.ln(10)
     pdf.set_font("Arial", style="B", size=14)
     pdf.set_text_color(50, 50, 50)
-    pdf.multi_cell(pdf.get_available_width(), 10, txt="Conclusion & Recommendations")
+    pdf.multi_cell(pdf.get_available_width(), 10, txt=f"Conclusion & Recommendations - {project_name}")
     pdf.ln(5)
     
     pdf.set_font("Arial", size=10)
@@ -968,12 +983,17 @@ def generate_pdf_report(high, medium, low, filename):
     pdf.output(filename)
 
 if __name__ == "__main__":
-    path,filename = check_sysarg()
+    path, filename = check_sysarg()
+    
+    # Extract project name from path
+    project_name = extract_project_name(path)
+    print(f"Scanning project: {project_name}")
+    
     findings = scan(path)
     category, description, reference, code = categorize_finding(findings)
     description = clean_description(description)
-    high ,medium, low = store_finding(category,description,reference,code)
+    high, medium, low = store_finding(category, description, reference, code)
 
-    generate_pdf_report(high, medium, low, filename)
+    generate_pdf_report(high, medium, low, filename, project_name)
     
     
