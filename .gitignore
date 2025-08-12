@@ -1,5 +1,15 @@
+# Ignore all PDF report files
 *.pdf
+
+# Ignore Semgrep scan output
 semgrep.json
 
+# Ignore all files in reports directory except .gitkeep
 reports/*
 !reports/.gitkeep
+
+# Ignore Python virtual environment directory
+.venv/
+
+# Ignore macOS system file
+.DS_Store

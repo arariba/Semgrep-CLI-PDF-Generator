@@ -699,6 +699,7 @@ class PDF(FPDF):
 # Scan the code for vulnerability using semgrep cli
 def scan(path):
     import os
+    import json
     
     # Store current working directory
     original_cwd = os.getcwd()
@@ -708,8 +709,8 @@ def scan(path):
         os.chdir(path)
         print(f"Changed to directory: {path}")
         
-        # Run semgrep from the project directory (relative path)
-        command = "semgrep scan ."
+        # Run semgrep from the project directory with JSON output
+        command = "semgrep scan . --json"
         
         with Progress(
             SpinnerColumn(),
@@ -723,7 +724,25 @@ def scan(path):
             progress.update(task, completed=1) 
             progress.update(task, description="Done")  
         
-        return result.stdout
+        # Check if semgrep command was successful
+        if result.returncode != 0:
+            print(f"Warning: Semgrep command failed with return code {result.returncode}")
+            if result.stderr:
+                print(f"Error output: {result.stderr}")
+            # Still try to parse the output in case there are partial results
+        
+        # Parse JSON output
+        try:
+            json_data = json.loads(result.stdout)
+            # Validate that we have the expected structure
+            if 'results' in json_data and isinstance(json_data['results'], list):
+                return json_data
+            else:
+                print("Warning: Semgrep JSON output doesn't have expected 'results' structure, falling back to text parsing")
+                return result.stdout
+        except json.JSONDecodeError:
+            print("Warning: Could not parse semgrep JSON output, falling back to text parsing")
+            return result.stdout
         
     finally:
         # Always restore the original working directory
@@ -790,7 +809,7 @@ def generate_default_output_path(project_name):
     
     return full_path
 
-# Combine the description
+# Combine the description (kept for backward compatibility)
 def clean_description(messages):
     combined_messages = []
     temp = ""
@@ -809,63 +828,161 @@ def clean_description(messages):
         combined_messages.append(temp)
     return combined_messages
 
-# Seperate the findings according to the severity level
-def categorize_finding(lines):
-    lines = lines.strip().split('\n')
-
+# Parse semgrep JSON output and separate findings according to severity level
+def categorize_finding(scan_data):
     category = []  
     description = []  
     reference = [] 
     code_lines = []  
 
-    for line in lines:
-        stripped_line = line.strip()  
+    # Check if we have JSON data or fallback to text parsing
+    if isinstance(scan_data, dict) and 'results' in scan_data:
+        # Parse JSON output
+        for result in scan_data['results']:
+            # Extract category (check_id)
+            cat = result.get('check_id', 'Unknown')
+            category.append(cat)
+            
+            # Extract description (message + path)
+            msg = result.get('extra', {}).get('message', '')
+            path = result.get('path', '')
+            
+            # Get additional context from metadata if available
+            metadata = result.get('extra', {}).get('metadata', {})
+            cwe = metadata.get('cwe', [])
+            impact = metadata.get('impact', '')
+            
+            # Build comprehensive description
+            desc_parts = [path, msg]
+            if cwe:
+                desc_parts.append(f"CWE: {', '.join(cwe)}")
+            if impact:
+                desc_parts.append(f"Impact: {impact}")
+            
+            desc = " - ".join(desc_parts).strip()
+            description.append(desc)
+            
+            # Extract reference (source URL) - prioritize shortlink
+            metadata = result.get('extra', {}).get('metadata', {})
+            ref = metadata.get('shortlink', '')
+            if not ref:
+                # Try alternative locations for the reference URL
+                ref = result.get('extra', {}).get('source', '')
+                if not ref:
+                    ref = metadata.get('source', '')
+                    if not ref:
+                        # Try references array
+                        references = metadata.get('references', [])
+                        if references:
+                            ref = references[0]
+                        else:
+                            ref = "Reference not available"
+            reference.append(ref)
+            
+            # Extract affected lines (actual code from the file)
+            lines = result.get('extra', {}).get('lines', '')
+            if not lines or lines == "requires login":  # Handle cases where lines field is not useful
+                # Fallback to start/end line numbers if lines not available
+                start_line = result.get('start', {}).get('line', '')
+                end_line = result.get('end', {}).get('line', '')
+                if start_line and end_line:
+                    if start_line == end_line:
+                        lines = f"Line {start_line}"
+                    else:
+                        lines = f"Lines {start_line}-{end_line}"
+                else:
+                    lines = "Line information not available"
+            
+            # Clean up the lines content
+            if lines and lines != "requires login":
+                # Remove any non-code content
+                lines = lines.strip()
+            code_lines.append(lines)
+    else:
+        # Fallback to original text parsing for backward compatibility
+        if isinstance(scan_data, str):
+            lines = scan_data.strip().split('\n')
+            
+            for line in lines:
+                stripped_line = line.strip()  
 
-        if stripped_line.startswith('❯❱') or stripped_line.startswith('❱') or stripped_line.startswith('❯❯❱'):
-            category.append(stripped_line)  
-        elif stripped_line.lower().startswith('details:'):
-            reference.append(stripped_line) 
-        elif 'Details:' in stripped_line:
-            continue
-        elif '┆' in stripped_line:
-            code_lines.append(stripped_line)  
-        else:
-            description.append(stripped_line)  
+                if stripped_line.startswith('❯❱') or stripped_line.startswith('❱') or stripped_line.startswith('❯❯❱'):
+                    category.append(stripped_line)  
+                elif stripped_line.lower().startswith('details:'):
+                    reference.append(stripped_line) 
+                elif 'Details:' in stripped_line:
+                    continue
+                elif '┆' in stripped_line:
+                    code_lines.append(stripped_line)  
+                else:
+                    description.append(stripped_line)  
 
     return category, description, reference, code_lines
 
 # Store the categorize findings to the class findings
-def store_finding(category_deciders, descriptions, references, codes):
+def store_finding(category_deciders, descriptions, references, codes, scan_data=None):
     high_findings = []
     medium_findings = []
     low_findings = []
 
-    for i in range(len(category_deciders)): 
-        category_decider = category_deciders[i]
-        description = descriptions[i]
-        reference = references[i]
-        code = codes[i]
+    # Check if we have JSON data for proper severity detection
+    if scan_data and isinstance(scan_data, dict) and 'results' in scan_data:
+        # Use JSON data for severity detection
+        for i, result in enumerate(scan_data['results']):
+            if i < len(category_deciders):
+                category_decider = category_deciders[i]
+                description = descriptions[i]
+                reference = references[i]
+                code = codes[i]
+                
+                # Get severity from JSON
+                severity = result.get('extra', {}).get('severity', 'ERROR').upper()
+                
+                if severity == 'ERROR':
+                    category = "high"
+                    findings_list = high_findings
+                elif severity == 'WARNING':
+                    category = "medium"
+                    findings_list = medium_findings
+                else:  # INFO or other
+                    category = "low"
+                    findings_list = low_findings
+                
+                # Clean up the data
+                category_decider = category_decider.strip()
+                code = code.strip()
+                reference = reference.strip()
+                
+                finding_instance = Findings(category_decider, description, reference, code)
+                findings_list.append(finding_instance)
+    else:
+        # Fallback to original text parsing for backward compatibility
+        for i in range(len(category_deciders)): 
+            category_decider = category_deciders[i]
+            description = descriptions[i]
+            reference = references[i]
+            code = codes[i]
 
-        if category_decider.startswith('❯❯❱'):
-            category = "high"
-            findings_list = high_findings
-            
-        elif category_decider.startswith('❯❱'):
-            category = "medium"
-            findings_list = medium_findings
+            if category_decider.startswith('❯❯❱'):
+                category = "high"
+                findings_list = high_findings
+                
+            elif category_decider.startswith('❯❱'):
+                category = "medium"
+                findings_list = medium_findings
 
-        elif category_decider.startswith('❱'):
-            category = "low"
-            findings_list = low_findings
+            elif category_decider.startswith('❱'):
+                category = "low"
+                findings_list = low_findings
 
-        else:
-            continue 
+            else:
+                continue 
 
-        category_decider = category_decider.replace('❯❯❱', '').replace('❯❱', '').replace('❱', '').strip()
-        code = code.replace('┆', '').strip()
-        reference = reference.replace('Details:', '').strip()
-        finding_instance = Findings(category_decider, description, reference, code)
-        findings_list.append(finding_instance)
+            category_decider = category_decider.replace('❯❯❱', '').replace('❯❱', '').replace('❱', '').strip()
+            code = code.replace('┆', '').strip()
+            reference = reference.replace('Details:', '').strip()
+            finding_instance = Findings(category_decider, description, reference, code)
+            findings_list.append(finding_instance)
 
     return high_findings, medium_findings, low_findings
 
@@ -922,7 +1039,12 @@ def generate_pdf_report(high, medium, low, filename, project_name):
     pdf.multi_cell(pdf.get_available_width(), 10, txt=f"Scan Summary - {project_name}")
     pdf.set_font("Arial", size=10)
     pdf.set_text_color(80, 80, 80)
-    pdf.multi_cell(pdf.get_available_width(), 10, findings[0])
+    # Add scan summary information
+    if isinstance(findings, dict) and 'results' in findings:
+        total_results = len(findings['results'])
+        pdf.multi_cell(pdf.get_available_width(), 10, f"Scan completed with {total_results} findings detected.")
+    else:
+        pdf.multi_cell(pdf.get_available_width(), 10, "Scan completed. Results processed.")
     pdf.ln(5)
     
     # Add note about smart summaries
@@ -933,8 +1055,26 @@ def generate_pdf_report(high, medium, low, filename, project_name):
 
     # High severity findings
     if high:
-        # Check if there's enough space for the header
-        if pdf.check_header_space():
+        # Check if there's enough space for the header AND first finding
+        # Calculate space needed for header + first finding
+        header_height = 15  # Header height
+        first_finding_height = 0
+        
+        # Calculate height needed for first finding
+        if high:
+            first_finding = high[0]
+            available_width = pdf.get_available_width()
+            data_width = available_width - int(available_width * 0.2)
+            first_finding_height += pdf.calculate_text_height(str(first_finding.category), data_width, 6)
+            first_finding_height += pdf.calculate_text_height(str(first_finding.description), data_width, 6)
+            first_finding_height += 6  # Severity level row
+            first_finding_height += pdf.calculate_text_height(str(first_finding.reference), data_width, 6)
+            first_finding_height += pdf.calculate_text_height(str(first_finding.code), data_width, 6)
+            first_finding_height += 15  # Spacing
+        
+        total_needed_height = header_height + first_finding_height
+        
+        if pdf.check_page_break(total_needed_height):
             pdf.add_page()
         
         # High severity header with red accent
@@ -952,8 +1092,26 @@ def generate_pdf_report(high, medium, low, filename, project_name):
 
     # Medium severity findings
     if medium:
-        # Check if there's enough space for the header
-        if pdf.check_header_space():
+        # Check if there's enough space for the header AND first finding
+        # Calculate space needed for header + first finding
+        header_height = 15  # Header height
+        first_finding_height = 0
+        
+        # Calculate height needed for first finding
+        if medium:
+            first_finding = medium[0]
+            available_width = pdf.get_available_width()
+            data_width = available_width - int(available_width * 0.2)
+            first_finding_height += pdf.calculate_text_height(str(first_finding.category), data_width, 6)
+            first_finding_height += pdf.calculate_text_height(str(first_finding.description), data_width, 6)
+            first_finding_height += 6  # Severity level row
+            first_finding_height += pdf.calculate_text_height(str(first_finding.reference), data_width, 6)
+            first_finding_height += pdf.calculate_text_height(str(first_finding.code), data_width, 6)
+            first_finding_height += 15  # Spacing
+        
+        total_needed_height = header_height + first_finding_height
+        
+        if pdf.check_page_break(total_needed_height):
             pdf.add_page()
         
         # Medium severity header with orange accent
@@ -971,8 +1129,26 @@ def generate_pdf_report(high, medium, low, filename, project_name):
 
     # Low severity findings
     if low:
-        # Check if there's enough space for the header
-        if pdf.check_header_space():
+        # Check if there's enough space for the header AND first finding
+        # Calculate space needed for header + first finding
+        header_height = 15  # Header height
+        first_finding_height = 0
+        
+        # Calculate height needed for first finding
+        if low:
+            first_finding = low[0]
+            available_width = pdf.get_available_width()
+            data_width = available_width - int(available_width * 0.2)
+            first_finding_height += pdf.calculate_text_height(str(first_finding.category), data_width, 6)
+            first_finding_height += pdf.calculate_text_height(str(first_finding.description), data_width, 6)
+            first_finding_height += 6  # Severity level row
+            first_finding_height += pdf.calculate_text_height(str(first_finding.reference), data_width, 6)
+            first_finding_height += pdf.calculate_text_height(str(first_finding.code), data_width, 6)
+            first_finding_height += 15  # Spacing
+        
+        total_needed_height = header_height + first_finding_height
+        
+        if pdf.check_page_break(total_needed_height):
             pdf.add_page()
         
         # Low severity header with green accent
@@ -1052,8 +1228,7 @@ if __name__ == "__main__":
     
     findings = scan(path)
     category, description, reference, code = categorize_finding(findings)
-    description = clean_description(description)
-    high, medium, low = store_finding(category, description, reference, code)
+    high, medium, low = store_finding(category, description, reference, code, findings)
 
     generate_pdf_report(high, medium, low, filename, project_name)
     
