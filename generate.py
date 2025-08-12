@@ -698,19 +698,37 @@ class PDF(FPDF):
 
 # Scan the code for vulnerability using semgrep cli
 def scan(path):
-    command = "semgrep scan " + path
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold blue]{task.description}"),
-    ) as progress:
-        task = progress.add_task("Scanning...", total=None)  
+    import os
+    
+    # Store current working directory
+    original_cwd = os.getcwd()
+    
+    try:
+        # Change to the project directory
+        os.chdir(path)
+        print(f"Changed to directory: {path}")
         
-        # Run the subprocess command
-        result = subprocess.run(command, capture_output=True, text=True, shell=True)
+        # Run semgrep from the project directory (relative path)
+        command = "semgrep scan ."
+        
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold blue]{task.description}"),
+        ) as progress:
+            task = progress.add_task("Scanning...", total=None)  
+            
+            # Run the subprocess command
+            result = subprocess.run(command, capture_output=True, text=True, shell=True)
 
-        progress.update(task, completed=1) 
-        progress.update(task, description="Done")  
-    return result.stdout
+            progress.update(task, completed=1) 
+            progress.update(task, description="Done")  
+        
+        return result.stdout
+        
+    finally:
+        # Always restore the original working directory
+        os.chdir(original_cwd)
+        print(f"Restored to directory: {original_cwd}")
 
 # Check for system arguments and extract the path
 def check_sysarg():
