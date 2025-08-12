@@ -920,6 +920,9 @@ def generate_pdf_report(high, medium, low, filename):
     if pdf.check_header_space(40):  # Conclusion needs more space
         pdf.add_page()
     
+    # Always add a new page for the conclusion section
+    pdf.add_page()
+    
     pdf.ln(10)
     pdf.set_font("Arial", style="B", size=14)
     pdf.set_text_color(50, 50, 50)
