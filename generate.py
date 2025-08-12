@@ -878,7 +878,9 @@ def generate_pdf_report(high, medium, low, filename, project_name):
     pdf.set_font("Arial", style="B", size=20)
     pdf.set_text_color(30, 30, 30)
     pdf.cell(0, 15, txt="", ln=1)  # Spacing
-    pdf.multi_cell(pdf.get_available_width(), 12, txt=f"Semgrep Security Analysis Report - {project_name}", align='C')
+    pdf.multi_cell(pdf.get_available_width(), 12, txt="Semgrep Security Analysis Report", align='C')
+    pdf.ln(2)  # Small spacing between title lines
+    pdf.multi_cell(pdf.get_available_width(), 12, txt=project_name, align='C')
     pdf.ln(5)
 
     # Add executive summary section
