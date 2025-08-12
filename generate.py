@@ -373,6 +373,56 @@ class PDF(FPDF):
         # Return the original text to preserve structure
         return text
 
+    # Specialized method for Affected Lines to handle code snippets properly
+    def optimize_affected_lines(self, text, max_width, line_height=6):
+        """Optimize Affected Lines to handle code snippets and prevent overflow"""
+        # For code snippets, we need to be more careful about line breaks
+        chars_per_line = int(max_width / 1.7)
+        
+        if '\n' in text:
+            # Multi-line code snippet
+            lines = text.split('\n')
+            optimized_lines = []
+            
+            for line in lines:
+                if len(line) <= chars_per_line:
+                    # Line fits, keep as is
+                    optimized_lines.append(line)
+                else:
+                    # Line is too long, need to break it
+                    if len(line) > chars_per_line * 2:
+                        # Very long line, truncate with ellipsis
+                        optimized_lines.append(line[:chars_per_line] + "...")
+                    else:
+                        # Moderately long line, try to break at spaces
+                        words = line.split()
+                        current_line = ""
+                        
+                        for word in words:
+                            test_line = current_line + " " + word if current_line else word
+                            if len(test_line) <= chars_per_line:
+                                current_line = test_line
+                            else:
+                                if current_line:
+                                    optimized_lines.append(current_line)
+                                current_line = word
+                        
+                        if current_line:
+                            optimized_lines.append(current_line)
+            
+            # Limit to reasonable number of lines to prevent cell overflow
+            if len(optimized_lines) > 4:
+                return '\n'.join(optimized_lines[:4]) + "\n[Additional lines available in scan output]"
+            else:
+                return '\n'.join(optimized_lines)
+        else:
+            # Single line, use normal optimization
+            if len(text) <= chars_per_line:
+                return text
+            else:
+                # Long single line, truncate appropriately
+                return text[:chars_per_line] + "..." if len(text) > chars_per_line else text
+
     # Calculate the height needed for text in a given width
     def calculate_text_height(self, text, width, line_height=6):  # Changed default from 10 to 6
         # Calculate how many lines the text will actually take with word wrapping
@@ -530,6 +580,9 @@ class PDF(FPDF):
         if text == "Category":
             # Use category-specific optimization to prevent line breaks for hyphenated terms
             display_data = self.optimize_category_text(display_data, data_width, line_height)
+        elif text == "Affected Lines":
+            # Use Affected Lines specific optimization to handle code snippets
+            display_data = self.optimize_affected_lines(display_data, data_width, line_height)
         else:
             # Use specialized optimization for the second column to minimize wasted space
             display_data = self.optimize_second_column_layout(display_data, data_width, line_height)
@@ -581,7 +634,19 @@ class PDF(FPDF):
                 total_height += self.calculate_text_height(str(finding.description), data_width, 6)
                 total_height += 6  # Severity level row (reduced height)
                 total_height += self.calculate_text_height(str(finding.reference), data_width, 6)
-                total_height += self.calculate_text_height(str(finding.code), data_width, 6)
+                
+                # Special handling for Affected Lines to account for multi-line code
+                affected_lines_text = str(finding.code)
+                if '\n' in affected_lines_text:
+                    # Multi-line code snippet
+                    lines = affected_lines_text.split('\n')
+                    # Limit to 4 lines maximum to prevent overflow
+                    limited_lines = lines[:4]
+                    affected_lines_text = '\n'.join(limited_lines)
+                    if len(lines) > 4:
+                        affected_lines_text += "\n[Additional lines available in scan output]"
+                
+                total_height += self.calculate_text_height(affected_lines_text, data_width, 6)
                 total_height += 15  # Add spacing between rows
                 
                 # Check if we need a page break to keep the entire finding together
