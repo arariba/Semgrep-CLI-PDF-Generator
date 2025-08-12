@@ -1,148 +1,240 @@
 # Semgrep CLI PDF Generator
 
-A Python tool that generates professional PDF security reports from Semgrep CLI scan results. This tool automatically categorizes vulnerabilities by severity level and presents them in a clean, formatted PDF document.
+A professional PDF report generator for Semgrep security scans that creates comprehensive, well-formatted security assessment reports with automatic project detection and intelligent content organization.
 
-## Features
+## 🚀 Features
 
-- 🔍 **Automated Scanning**: Uses Semgrep CLI to scan your codebase for security vulnerabilities
-- 📊 **Severity Classification**: Automatically categorizes findings into High, Medium, and Low severity levels
-- 📄 **Professional PDF Reports**: Generates clean, formatted PDF reports with detailed vulnerability information
-- 🎨 **Color-coded Severity**: Visual severity indicators in the PDF output
-- ⚡ **Progress Tracking**: Real-time progress indicators during scanning
+### **Professional PDF Reports**
+- **Executive Summary** with findings statistics
+- **Color-coded severity sections** (High, Medium, Low)
+- **Smart text wrapping** with optimized space utilization
+- **Automatic page breaks** to prevent content splitting
+- **Professional styling** with consistent typography and colors
 
-## Prerequisites
+### **Intelligent Content Handling**
+- **Smart text summaries** for extremely long descriptions
+- **Category optimization** to prevent unnecessary line breaks
+- **Code snippet handling** with proper overflow prevention
+- **Hyphen-aware text wrapping** for technical terms
 
-### Semgrep CLI
-This tool requires Semgrep CLI to be installed on your system. Follow the official installation guide:
+### **Automatic Project Detection**
+- **Project name extraction** from directory paths
+- **Personalized report content** with project-specific information
+- **Automatic output organization** in structured directories
+- **Timestamped filenames** for version tracking
 
-**macOS:**
-```bash
-brew install semgrep
-```
+### **User Experience**
+- **Optional output filenames** with smart defaults
+- **Progress indicators** during scanning
+- **Clear error messages** and usage instructions
+- **Cross-platform compatibility**
 
-**Ubuntu/Debian:**
-```bash
-python3 -m pip install semgrep
-```
+## 📋 Requirements
 
-**Windows:**
-```bash
-pip install semgrep
-```
+- Python 3.7+
+- Semgrep CLI installed and accessible
+- Required Python packages (see `requirements.txt`)
 
-For more installation options, visit: https://semgrep.dev/docs/getting-started/quickstart
+## 🛠️ Installation
 
-### Python Environment
-This tool has been tested on Ubuntu, macOS, and Windows. It's recommended to use a Python virtual environment:
-
-```bash
-# Create virtual environment
-python3 -m venv venv
-
-# Activate virtual environment
-# On macOS/Linux:
-source venv/bin/activate
-# On Windows:
-venv\Scripts\activate
-```
-
-## Installation
-
-1. **Clone or download this repository**
-2. **Install Python dependencies:**
+1. **Clone the repository:**
    ```bash
-   pip install -r requirement.txt
+   git clone <repository-url>
+   cd Semgrep-CLI-PDF-Generator
    ```
 
-## Usage
+2. **Create virtual environment:**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
 
-### Basic Usage
+3. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Verify Semgrep CLI:**
+   ```bash
+   semgrep --version
+   ```
+
+## 🎯 Usage
+
+### **Basic Usage (Recommended)**
 ```bash
-python generate.py [PATH/TO/CODE] [OUTPUT_FILENAME]
+# Generate report with automatic filename and organization
+python3 generate.py /path/to/your/project/
+
+# Example
+python3 generate.py /Users/username/projects/my-app/
 ```
 
-### Examples
-
-**Scan a JavaScript project:**
+### **Custom Output Filename**
 ```bash
-python generate.py ./my-js-project javascript-security-report.pdf
+# Specify custom output filename
+python3 generate.py /path/to/your/project/ custom-report.pdf
+
+# Example
+python3 generate.py /Users/username/projects/my-app/ security-audit.pdf
 ```
 
-**Scan a Python project:**
-```bash
-python generate.py ./my-python-app python-vulnerabilities.pdf
+### **Output Structure**
+When using automatic filenames, reports are organized as:
+```
+report/
+├── my-app/
+│   ├── my-app-202412151430.pdf
+│   ├── my-app-202412151445.pdf
+│   └── my-app-202412151500.pdf
+├── another-project/
+│   └── another-project-202412151435.pdf
 ```
 
-**Scan a specific file:**
-```bash
-python generate.py ./src/main.py single-file-report.pdf
+## 📊 Report Structure
+
+### **1. Header Section**
+- Company/Project branding
+- Generation timestamp
+- Professional styling
+
+### **2. Executive Summary**
+- Project name and scan statistics
+- Total findings count
+- Breakdown by severity level
+- Professional summary table
+
+### **3. Scan Summary**
+- Project-specific scan information
+- Scan results overview
+
+### **4. Findings Sections**
+- **High Severity** (Red accent)
+- **Medium Severity** (Orange accent)
+- **Low Severity** (Green accent)
+
+### **5. Conclusion & Recommendations**
+- Priority-based action items
+- Security best practices
+- Next steps for remediation
+
+## 🔧 Advanced Features
+
+### **Smart Text Handling**
+- **Long descriptions**: Automatically summarized for readability
+- **Category fields**: Optimized to prevent line breaks at hyphens
+- **Code snippets**: Limited to prevent cell overflow
+- **Text wrapping**: Intelligent line breaks with 85-95% space utilization
+
+### **Layout Optimization**
+- **Page break prevention**: Content never splits across pages
+- **Dynamic cell heights**: Automatically adjusts to content
+- **Professional margins**: Consistent spacing and boundaries
+- **Color-coded sections**: Visual severity indicators
+
+### **Project Intelligence**
+- **Automatic naming**: Extracts project name from path
+- **Path normalization**: Handles trailing slashes automatically
+- **Relative paths**: Shows clean file paths in reports
+- **Timestamp tracking**: Unique filenames for each scan
+
+## 📁 File Structure
+
+```
+Semgrep-CLI-PDF-Generator/
+├── generate.py              # Main script
+├── requirements.txt         # Python dependencies
+├── README.md               # This file
+├── LICENSE                 # License information
+├── report/                 # Generated reports (auto-created)
+│   ├── project1/
+│   └── project2/
+└── Sample Vulnerability/   # Example files for testing
+    ├── javascript.js
+    ├── vuln.js
+    └── vuln.py
 ```
 
-### Output
+## 🎨 Customization
 
-The tool generates a PDF report containing:
-- **Executive Summary**: Overview of findings
-- **High Severity Vulnerabilities**: Critical security issues (red-coded)
-- **Medium Severity Vulnerabilities**: Important security issues (yellow-coded)
-- **Low Severity Vulnerabilities**: Minor security issues (green-coded)
+### **Modifying Report Styling**
+Edit the `generate.py` file to customize:
+- Colors and fonts
+- Header/footer content
+- Section layouts
+- Text formatting
 
-Each vulnerability includes:
-- Category/Type
-- Description
-- Severity Level
-- Reference information
-- Affected code lines
+### **Adjusting Text Wrapping**
+Modify the character width calculation:
+```python
+# Current setting (aggressive space utilization)
+chars_per_line = int(max_width / 1.7)
 
-## Sample Reports
+# For more conservative wrapping
+chars_per_line = int(max_width / 2.0)
+```
 
-Check the `Sample Report/` directory for example PDF outputs:
-- `javascript.pdf` - Sample JavaScript security report
-- `python.pdf` - Sample Python security report
+## 🚨 Troubleshooting
 
-## Sample Vulnerabilities
+### **Common Issues**
 
-The `Sample Vulnerability/` directory contains example vulnerable code files for testing:
-- `javascript.js` - JavaScript vulnerabilities
-- `vuln.js` - Additional JavaScript examples
-- `vuln.py` - Python vulnerabilities
+1. **Semgrep not found:**
+   ```bash
+   # Install Semgrep CLI
+   pip install semgrep
+   # or
+   brew install semgrep  # macOS
+   ```
 
-## Dependencies
+2. **Permission errors:**
+   ```bash
+   # Ensure write permissions to report directory
+   chmod 755 report/
+   ```
 
-- **rich**: For progress indicators and enhanced terminal output
-- **fpdf**: For PDF generation and formatting
-- **semgrep**: For static code analysis (external dependency)
+3. **Unicode errors:**
+   - All text is now Latin-1 compatible
+   - No special characters that could cause encoding issues
 
-## Troubleshooting
+### **Debug Mode**
+Add verbose output by modifying the scan function:
+```python
+print(f"Scanning directory: {path}")
+print(f"Command: {command}")
+```
 
-### Common Issues
+## 📈 Performance
 
-**"semgrep: command not found"**
-- Ensure Semgrep CLI is properly installed and in your PATH
-- Try reinstalling Semgrep CLI following the official documentation
+- **Fast scanning**: Direct directory access
+- **Efficient PDF generation**: Optimized text handling
+- **Memory management**: Streamlined content processing
+- **Cross-platform**: Works on Windows, macOS, and Linux
 
-**Permission errors**
-- Make sure you have read permissions for the target directory
-- On Windows, try running as administrator if needed
+## 🤝 Contributing
 
-**PDF generation errors**
-- Ensure the output directory is writable
-- Check that the filename doesn't contain invalid characters
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
-### Getting Help
+## 📄 License
 
-If you encounter issues:
-1. Verify Semgrep CLI is installed: `semgrep --version`
-2. Check Python dependencies: `pip list | grep -E "(rich|fpdf)"`
-3. Ensure you have proper permissions for the target directory
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Contributing
+## 🙏 Acknowledgments
 
-Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
+- **Semgrep** for the excellent security scanning tool
+- **FPDF** for PDF generation capabilities
+- **Rich** for beautiful progress indicators
 
-## License
+## 📞 Support
 
-This project is open source. See the LICENSE file for details.
+For issues, questions, or contributions:
+- Open an issue on GitHub
+- Check the troubleshooting section
+- Review the code comments for implementation details
 
 ---
 
-**Note**: This tool is designed to assist with security analysis but should not replace comprehensive security testing. Always review findings manually and consider the context of your specific application.
+**Happy Security Scanning! 🔒**
