@@ -335,31 +335,43 @@ class PDF(FPDF):
         if len(text) <= chars_per_line:
             return text
         
-        # If it doesn't fit, we need to handle it carefully
-        # First, try to break only at dots (.) and keep hyphens together
-        if '.' in text:
-            parts = text.split('.')
-            lines = []
-            current_line = ""
-            
-            for part in parts:
-                test_line = current_line + "." + part if current_line else part
+        # If it doesn't fit, be very conservative about breaking
+        # Only break if the text is significantly longer than the line width
+        if len(text) > chars_per_line * 1.5:  # Only break if 50% longer than line width
+            # Try to break at dots (.) but be very careful
+            if '.' in text:
+                parts = text.split('.')
+                if len(parts) == 2:
+                    # Only two parts, try to keep them together if possible
+                    if len(parts[0]) + len(parts[1]) + 1 <= chars_per_line * 1.3:
+                        return text  # Keep together
                 
-                if len(test_line) <= chars_per_line:
-                    current_line = test_line
-                else:
-                    if current_line:
-                        lines.append(current_line)
-                    current_line = part
-            
-            if current_line:
-                lines.append(current_line)
-            
-            return '\n'.join(lines)
-        else:
-            # No dots, just hyphens - keep the entire text together
-            # If it's too long, we'll have to let it overflow rather than break at hyphens
-            return text
+                # Multiple parts, try minimal breaking
+                lines = []
+                current_line = ""
+                
+                for part in parts:
+                    test_line = current_line + "." + part if current_line else part
+                    
+                    if len(test_line) <= chars_per_line:
+                        current_line = test_line
+                    else:
+                        if current_line:
+                            lines.append(current_line)
+                        current_line = part
+                
+                if current_line:
+                    lines.append(current_line)
+                
+                # If we only have one line or the result is not significantly better, return original
+                if len(lines) <= 1 or len(lines) == 2 and len(text) <= chars_per_line * 1.3:
+                    return text
+                
+                return '\n'.join(lines)
+        
+        # If we get here, the text is not long enough to warrant breaking
+        # Return the original text to preserve structure
+        return text
 
     # Calculate the height needed for text in a given width
     def calculate_text_height(self, text, width, line_height=6):  # Changed default from 10 to 6
