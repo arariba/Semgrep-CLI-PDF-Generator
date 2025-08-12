@@ -47,7 +47,8 @@ class PDF(FPDF):
     def truncate_text_by_height(self, text, max_width, max_height, line_height=6):  # Changed default from 10 to 6
         # Calculate how many lines we can fit
         max_lines = int(max_height / line_height)
-        chars_per_line = int(max_width / 2.5)
+        # Use more accurate character width calculation for better space utilization
+        chars_per_line = int(max_width / 2.2)  # Reduced from 2.5 to 2.2
         
         # If text fits in one line, return as is
         if len(text) <= chars_per_line:
@@ -119,6 +120,74 @@ class PDF(FPDF):
             truncated_lines = lines[:max_lines]
             return '\n'.join(truncated_lines)
 
+    # Specialized method for second column to maximize space utilization
+    def optimize_second_column_layout(self, text, max_width, line_height=6):
+        """Optimize layout specifically for the second column to minimize wasted space"""
+        # Use even more aggressive character width calculation for data column
+        chars_per_line = int(max_width / 2.0)  # More aggressive than 2.2
+        
+        if len(text) <= chars_per_line:
+            return text
+        
+        # Split text into words and build highly optimized lines
+        words = text.split()
+        lines = []
+        current_line = ""
+        
+        for i, word in enumerate(words):
+            # Check if adding this word would exceed the line width
+            test_line = current_line + " " + word if current_line else word
+            
+            if len(test_line) <= chars_per_line:
+                # Word fits on current line
+                current_line = test_line
+            else:
+                # Word doesn't fit, optimize current line before breaking
+                if current_line:
+                    # Calculate wasted space
+                    wasted_space = chars_per_line - len(current_line)
+                    
+                    # If wasted space is more than 15% (more aggressive than 20%), try to fit more
+                    if wasted_space > chars_per_line * 0.15:
+                        # Look ahead more aggressively to find better line combinations
+                        remaining_words = words[i:]
+                        best_line = current_line
+                        best_utilization = len(current_line) / chars_per_line
+                        
+                        # Try different combinations of remaining words
+                        temp_line = current_line
+                        for j, next_word in enumerate(remaining_words):
+                            test_temp = temp_line + " " + next_word
+                            if len(test_temp) <= chars_per_line:
+                                temp_line = test_temp
+                                utilization = len(temp_line) / chars_per_line
+                                
+                                # Keep the line with best space utilization
+                                if utilization > best_utilization:
+                                    best_line = temp_line
+                                    best_utilization = utilization
+                            else:
+                                break
+                        
+                        # Use the best line we found
+                        if best_utilization > len(current_line) / chars_per_line:
+                            current_line = best_line
+                            # Skip the words we just added
+                            i += len(best_line.split()) - len(current_line.split()) - 1
+                    
+                    # Add the optimized line
+                    lines.append(current_line)
+                    current_line = word
+                else:
+                    # Start new line
+                    current_line = word
+        
+        # Add the last line if there's content
+        if current_line:
+            lines.append(current_line)
+        
+        return '\n'.join(lines)
+
     # Create a smart summary for extremely long descriptions
     def create_smart_summary(self, text, max_lines=12, chars_per_line=60):  # Increased max_lines from 8 to 12
         """Create a smart summary for very long descriptions"""
@@ -153,10 +222,70 @@ class PDF(FPDF):
         
         return summary
 
+    # Optimize text layout to better utilize available space
+    def optimize_text_layout(self, text, max_width, line_height=6):
+        """Optimize text layout to minimize unnecessary line breaks and reduce wasted space"""
+        # Use more accurate character width calculation
+        chars_per_line = int(max_width / 2.2)
+        
+        if len(text) <= chars_per_line:
+            return text
+        
+        # Split text into words and build optimized lines
+        words = text.split()
+        lines = []
+        current_line = ""
+        
+        for i, word in enumerate(words):
+            # Check if adding this word would exceed the line width
+            test_line = current_line + " " + word if current_line else word
+            
+            if len(test_line) <= chars_per_line:
+                # Word fits on current line
+                current_line = test_line
+            else:
+                # Word doesn't fit, but check if we can optimize the current line
+                if current_line:
+                    # Check if current line has significant wasted space
+                    wasted_space = chars_per_line - len(current_line)
+                    
+                    # If wasted space is more than 20% of line width, try to fit more words
+                    if wasted_space > chars_per_line * 0.2:
+                        # Look ahead to see if we can fit more words
+                        remaining_words = words[i:]
+                        temp_line = current_line
+                        
+                        for next_word in remaining_words:
+                            test_temp = temp_line + " " + next_word
+                            if len(test_temp) <= chars_per_line:
+                                temp_line = test_temp
+                            else:
+                                break
+                        
+                        # If we found a better line, use it
+                        if len(temp_line) > len(current_line):
+                            current_line = temp_line
+                            # Skip the words we just added
+                            i += len(temp_line.split()) - len(current_line.split()) - 1
+                    
+                    # Add the optimized line
+                    lines.append(current_line)
+                    current_line = word
+                else:
+                    # Start new line
+                    current_line = word
+        
+        # Add the last line if there's content
+        if current_line:
+            lines.append(current_line)
+        
+        return '\n'.join(lines)
+
     # Calculate the height needed for text in a given width
     def calculate_text_height(self, text, width, line_height=6):  # Changed default from 10 to 6
         # Calculate how many lines the text will actually take with word wrapping
-        chars_per_line = int(width / 2.5)
+        # Use more accurate character width calculation
+        chars_per_line = int(width / 2.2)  # Reduced from 2.5 to 2.2 for better space utilization
         
         if len(text) <= chars_per_line:
             return line_height
@@ -301,6 +430,9 @@ class PDF(FPDF):
         
         # Apply intelligent text wrapping that respects word boundaries
         display_data = self.truncate_text_by_height(str(display_data), data_width, data_height, line_height)
+        
+        # Use specialized optimization for the second column to minimize wasted space
+        display_data = self.optimize_second_column_layout(display_data, data_width, line_height)
         
         # Check if we need a page break to keep the table row together
         if self.check_page_break(data_height):
