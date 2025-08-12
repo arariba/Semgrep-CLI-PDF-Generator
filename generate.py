@@ -54,6 +54,47 @@ class PDF(FPDF):
         if len(text) <= chars_per_line:
             return text
         
+        # For text with hyphens, be extra careful about line breaks
+        if '-' in text:
+            # Try to keep hyphenated terms together
+            words = text.split()
+            lines = []
+            current_line = ""
+            
+            for word in words:
+                # Check if adding this word would exceed the line width
+                test_line = current_line + " " + word if current_line else word
+                
+                if len(test_line) <= chars_per_line:
+                    # Word fits on current line
+                    current_line = test_line
+                else:
+                    # Word doesn't fit, but check if it contains hyphens
+                    if '-' in word and len(word) > chars_per_line:
+                        # This word has hyphens and is too long - keep it together
+                        if current_line:
+                            lines.append(current_line)
+                        lines.append(word)
+                        current_line = ""
+                    else:
+                        # Normal word, start new line
+                        if current_line:
+                            lines.append(current_line)
+                        current_line = word
+            
+            # Add the last line if there's content
+            if current_line:
+                lines.append(current_line)
+            
+            # Limit to max_lines and join
+            if len(lines) <= max_lines:
+                return '\n'.join(lines)
+            else:
+                # If we have more lines than can fit, truncate at word boundaries
+                truncated_lines = lines[:max_lines]
+                return '\n'.join(truncated_lines)
+        
+        # Original logic for text without hyphens
         # Split text into words and build lines intelligently
         words = text.split()
         lines = []
@@ -92,12 +133,12 @@ class PDF(FPDF):
                             for i, part in enumerate(parts):
                                 if i > 0:
                                     part = '_' + part
-                                if len(part) <= chars_per_line:
-                                    lines.append(part)
+                                if len(word) <= chars_per_line:
+                                    lines.append(word)
                                 else:
-                                    # Break long part into chunks
-                                    for j in range(0, len(part), chars_per_line):
-                                        chunk = part[j:j + chars_per_line]
+                                    # Break long word into chunks
+                                    for i in range(0, len(word), chars_per_line):
+                                        chunk = word[i:i + chars_per_line]
                                         lines.append(chunk)
                         else:
                             # Break long word into chunks
@@ -281,6 +322,45 @@ class PDF(FPDF):
         
         return '\n'.join(lines)
 
+    # Specialized method for category text to prevent unnecessary line breaks
+    def optimize_category_text(self, text, max_width, line_height=6):
+        """Optimize category text to prevent line breaks for hyphenated terms"""
+        # For categories, we want to keep hyphenated terms together
+        if '-' not in text:
+            # No hyphens, use normal optimization
+            return self.optimize_text_layout(text, max_width, line_height)
+        
+        # Check if the entire category fits on one line
+        chars_per_line = int(max_width / 1.7)
+        if len(text) <= chars_per_line:
+            return text
+        
+        # If it doesn't fit, we need to handle it carefully
+        # First, try to break only at dots (.) and keep hyphens together
+        if '.' in text:
+            parts = text.split('.')
+            lines = []
+            current_line = ""
+            
+            for part in parts:
+                test_line = current_line + "." + part if current_line else part
+                
+                if len(test_line) <= chars_per_line:
+                    current_line = test_line
+                else:
+                    if current_line:
+                        lines.append(current_line)
+                    current_line = part
+            
+            if current_line:
+                lines.append(current_line)
+            
+            return '\n'.join(lines)
+        else:
+            # No dots, just hyphens - keep the entire text together
+            # If it's too long, we'll have to let it overflow rather than break at hyphens
+            return text
+
     # Calculate the height needed for text in a given width
     def calculate_text_height(self, text, width, line_height=6):  # Changed default from 10 to 6
         # Calculate how many lines the text will actually take with word wrapping
@@ -409,7 +489,10 @@ class PDF(FPDF):
         display_data = str(data)
         
         # For descriptions, check if they're extremely long and create smart summaries
-        if text == "Description" and len(display_data) > 500:  # Very long descriptions
+        if text == "Category" and '-' in str(data):
+            # For categories with hyphens, treat them as single units to prevent line breaks
+            display_data = str(data)
+        elif text == "Description" and len(display_data) > 500:  # Very long descriptions
             display_data = self.create_smart_summary(display_data)
         elif text == "Reference" and len(display_data) > 300:  # Long references
             display_data = self.create_smart_summary(display_data, max_lines=4, chars_per_line=60)
@@ -431,8 +514,13 @@ class PDF(FPDF):
         # Apply intelligent text wrapping that respects word boundaries
         display_data = self.truncate_text_by_height(str(display_data), data_width, data_height, line_height)
         
-        # Use specialized optimization for the second column to minimize wasted space
-        display_data = self.optimize_second_column_layout(display_data, data_width, line_height)
+        # Use specialized optimization based on field type
+        if text == "Category":
+            # Use category-specific optimization to prevent line breaks for hyphenated terms
+            display_data = self.optimize_category_text(display_data, data_width, line_height)
+        else:
+            # Use specialized optimization for the second column to minimize wasted space
+            display_data = self.optimize_second_column_layout(display_data, data_width, line_height)
         
         # Check if we need a page break to keep the table row together
         if self.check_page_break(data_height):
