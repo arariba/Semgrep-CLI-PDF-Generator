@@ -47,8 +47,8 @@ class PDF(FPDF):
     def truncate_text_by_height(self, text, max_width, max_height, line_height=6):  # Changed default from 10 to 6
         # Calculate how many lines we can fit
         max_lines = int(max_height / line_height)
-        # Use more accurate character width calculation for better space utilization
-        chars_per_line = int(max_width / 2.2)  # Reduced from 2.5 to 2.2
+        # Use consistent character width calculation
+        chars_per_line = int(max_width / 1.7)  # Updated from 1.6 to 1.7
         
         # If text fits in one line, return as is
         if len(text) <= chars_per_line:
@@ -124,7 +124,7 @@ class PDF(FPDF):
     def optimize_second_column_layout(self, text, max_width, line_height=6):
         """Optimize layout specifically for the second column to minimize wasted space"""
         # Use even more aggressive character width calculation for data column
-        chars_per_line = int(max_width / 2.0)  # More aggressive than 2.2
+        chars_per_line = int(max_width / 1.7)  # Updated from 1.6 to 1.7
         
         if len(text) <= chars_per_line:
             return text
@@ -225,8 +225,8 @@ class PDF(FPDF):
     # Optimize text layout to better utilize available space
     def optimize_text_layout(self, text, max_width, line_height=6):
         """Optimize text layout to minimize unnecessary line breaks and reduce wasted space"""
-        # Use more accurate character width calculation
-        chars_per_line = int(max_width / 2.2)
+        # Use consistent character width calculation
+        chars_per_line = int(max_width / 1.7)  # Updated from 1.6 to 1.7
         
         if len(text) <= chars_per_line:
             return text
@@ -284,8 +284,8 @@ class PDF(FPDF):
     # Calculate the height needed for text in a given width
     def calculate_text_height(self, text, width, line_height=6):  # Changed default from 10 to 6
         # Calculate how many lines the text will actually take with word wrapping
-        # Use more accurate character width calculation
-        chars_per_line = int(width / 2.2)  # Reduced from 2.5 to 2.2 for better space utilization
+        # Use consistent character width calculation
+        chars_per_line = int(width / 1.7)  # Updated from 1.6 to 1.7
         
         if len(text) <= chars_per_line:
             return line_height
