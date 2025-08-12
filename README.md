@@ -29,6 +29,20 @@ A professional PDF report generator for Semgrep security scans that creates comp
 - **Clear error messages** and usage instructions
 - **Cross-platform compatibility**
 
+## 🚀 Quick Start
+
+```bash
+# Clone and setup
+git clone <repository-url>
+cd Semgrep-CLI-PDF-Generator
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# Generate your first report
+python3 generate.py /path/to/your/project/
+```
+
 ## 📋 Requirements
 
 - Python 3.7+
@@ -82,7 +96,7 @@ python3 generate.py /Users/username/projects/my-app/ security-audit.pdf
 ### **Output Structure**
 When using automatic filenames, reports are organized as:
 ```
-report/
+reports/
 ├── my-app/
 │   ├── my-app-202412151430.pdf
 │   ├── my-app-202412151445.pdf
@@ -146,13 +160,10 @@ Semgrep-CLI-PDF-Generator/
 ├── requirements.txt         # Python dependencies
 ├── README.md               # This file
 ├── LICENSE                 # License information
-├── report/                 # Generated reports (auto-created)
-│   ├── project1/
-│   └── project2/
-└── Sample Vulnerability/   # Example files for testing
-    ├── javascript.js
-    ├── vuln.js
-    └── vuln.py
+├── semgrep.json           # Sample Semgrep scan results (for testing)
+├── reports/                # Generated reports (auto-created)
+│   └── project-name/       # Organized by project
+└── venv/                   # Virtual environment
 ```
 
 ## 🎨 Customization
@@ -188,8 +199,8 @@ chars_per_line = int(max_width / 2.0)
 
 2. **Permission errors:**
    ```bash
-   # Ensure write permissions to report directory
-   chmod 755 report/
+   # Ensure write permissions to reports directory
+   chmod 755 reports/
    ```
 
 3. **Unicode errors:**
@@ -209,6 +220,10 @@ print(f"Command: {command}")
 - **Efficient PDF generation**: Optimized text handling
 - **Memory management**: Streamlined content processing
 - **Cross-platform**: Works on Windows, macOS, and Linux
+
+## 🧪 Testing
+
+The project includes a `semgrep.json` file with sample scan results for testing the PDF generation functionality without running actual Semgrep scans.
 
 ## 🤝 Contributing
 
